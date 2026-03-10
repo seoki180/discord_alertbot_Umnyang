@@ -1,0 +1,9 @@
+services:
+  alertbot:
+    build: .
+    container_name: discord-alert
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data.json:/app/data.json
