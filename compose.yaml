@@ -1,7 +1,7 @@
 services:
   alertbot:
     build: .
-    container_name: discord-alert
+    container_name: umnyang
     restart: unless-stopped
     env_file:
       - .env

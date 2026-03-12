@@ -7,6 +7,7 @@ const {
   REST,
   Routes,
   SlashCommandBuilder,
+  ChannelType,
 } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
@@ -16,7 +17,7 @@ const path = require("path");
 // ─────────────────────────────────────────────
 const NOTICE_CHANNEL_ID = process.env.NOTICE_CHANNEL_ID; // 공지 채널 ID
 const CHECK_EMOJI = "✅"; // 읽음 확인 이모지
-const CHECK_DELAY_MS = 24 * 60 * 60 * 1000; //24 시간 뒤 체크
+const CHECK_DELAY_MS = 20 * 60 * 60 * 1000; //20 시간 뒤 체크
 const DATA_FILE = path.join(__dirname, "data.json"); // 공지 추적 데이터
 const UMC10TH = process.env.ROLE_10TH;
 
@@ -25,6 +26,14 @@ const TARGET_ROLE_IDS = [UMC10TH];
 const ADMIN_IDS = [process.env.ADMIN_ID]; //사용자 ID
 const COMMAND_ALLOWED_ROLE_IDS = [UMC10TH]; //커맨드 사용 역할 ID
 
+const DM_GUIDE =
+  `**공지 읽음 확인 봇 안내**\n\n` +
+  `이 봇은 공지 채널의 메시지를 읽지 않은 멤버에게 자동으로 DM을 보낼꺼다냥!\n\n` +
+  `**공지 읽음 처리 방법**\n` +
+  `공지 채널의 메시지에 \u2705 이모지를 달면 읽음 처리될거다냥!\n\n` +
+  `문의사항은 서버 관리자에게 연락달라냐옹~\n\n` +
+  `(근데 나한테 DM도 보내고 할거 진짜 없나 보다냥 ㅋ 워크북이나 해라냥 ㅋ)`;
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -32,6 +41,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
@@ -187,6 +197,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot) return;
+
+  // DM 채널에서 온 메시지면 안내 메시지 답장
+  if (message.channel.type === ChannelType.DM) {
+    try {
+      await message.reply(DM_GUIDE);
+      console.log(`DM guide sent to: ${message.author.tag}`);
+    } catch (err) {
+      console.warn(`DM guide failed: ${message.author.tag}`, err.message);
+    }
+    return;
+  }
+});
+
 // ─── 읽음 처리 ────────────────────────────────────────────────────────────────
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
   if (user.bot) return;
@@ -307,13 +332,13 @@ async function checkAndNotify(messageId) {
 
     for (const member of unreadMembers) {
       try {
-        // await member.send(
-        //   `\uD83D\uDCE2 **읽지 않은 공지가 있어요!**\n\n` +
-        //     `아래 공지를 아직 확인하지 않으셨어요.\n` +
-        //     `${CHECK_EMOJI} 이모지를 눌러 읽음 처리해주세요!\n\n` +
-        //     `> ${entry.content}${entry.content.length >= 100 ? "..." : ""}\n\n` +
-        //     `\uD83D\uDD17 공지 바로가기: ${messageLink}`,
-        // );
+        await member.send(
+          `\uD83D\uDCE2 **읽지 않은 공지가 있어요!**\n\n` +
+            `아래 공지를 아직 확인하지 않으셨어요.\n` +
+            `${CHECK_EMOJI} 이모지를 눌러 읽음 처리해주세요!\n\n` +
+            `> ${entry.content}${entry.content.length >= 100 ? "..." : ""}\n\n` +
+            `\uD83D\uDD17 공지 바로가기: ${messageLink}`,
+        );
         console.log(`DM sent: ${member.user.tag}`);
         ok++;
       } catch {
@@ -326,13 +351,13 @@ async function checkAndNotify(messageId) {
       await sleep(500);
     }
 
-    // await notifyAdmins(
-    //   entry,
-    //   messageId,
-    //   sentSoFar,
-    //   unreadMembers.length,
-    //   members.size,
-    // );
+    await notifyAdmins(
+      entry,
+      messageId,
+      sentSoFar,
+      unreadMembers.length,
+      members.size,
+    );
 
     entry.notifiedAt = Date.now();
     saveData(data);
